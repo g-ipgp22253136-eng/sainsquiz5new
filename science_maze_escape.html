@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>形状小侦探 - Shape Maze Escape</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700;800&family=ZCOOL+KuaiLe&display=swap');
+
+        body {
+            font-family: 'Fredoka', 'ZCOOL KuaiLe', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311b92 100%);
+            touch-action: manipulation;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        /* Glassmorphism Styling */
+        .maze-glass {
+            background: rgba(255, 255, 255, 0.95);
+            border: 4px solid #8b5cf6;
+            box-shadow: 0 8px 0 #6d28d9, 0 12px 24px rgba(0,0,0,0.4);
+        }
+
+        .maze-btn {
+            background: linear-gradient(180deg, #ec4899 0%, #d946ef 50%, #c026d3 100%);
+            border: 3px solid #701a75;
+            box-shadow: 0 5px 0 #701a75, 0 6px 12px rgba(0,0,0,0.3);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+            transition: all 0.08s ease;
+        }
+
+        .maze-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #701a75, 0 3px 5px rgba(0,0,0,0.3);
+        }
+
+        .dpad-btn {
+            background: linear-gradient(180deg, #8b5cf6 0%, #6d28d9 100%);
+            border: 2px solid #4c1d95;
+            box-shadow: 0 4px 0 #4c1d95;
+        }
+
+        .dpad-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 0 #4c1d95;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px rgba(236, 72, 153, 0.6)); }
+            50% { transform: scale(1.04); filter: drop-shadow(0 0 16px rgba(236, 72, 153, 0.9)); }
+        }
+
+        .animate-pulse-glow {
+            animation: pulse-glow 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between items-center relative overflow-hidden">
+
+    <!-- START MENU SCREEN -->
+    <div id="start-screen" class="absolute inset-0 flex flex-col items-center justify-center p-4 z-50 bg-slate-950/80 backdrop-blur-md">
+        <div class="maze-glass rounded-3xl p-6 md:p-8 max-w-lg w-full text-center flex flex-col items-center animate-pulse-glow">
+            
+            <!-- Character Avatar -->
+            <div class="w-24 h-24 bg-gradient-to-tr from-purple-500 to-pink-500 rounded-3xl flex items-center justify-center mb-3 border-4 border-purple-900 shadow-lg">
+                <span class="text-5xl">📐</span>
+            </div>
+
+            <h1 class="text-3xl md:text-4xl font-extrabold text-purple-950 mb-1 tracking-wider uppercase">
+                🔍 形状小侦探 🔍
+            </h1>
+            <p class="text-purple-800 font-bold mb-4 text-xs md:text-sm">Shape Detective Maze · 探索迷宫，找到正确的形状答案！</p>
+
+            <div class="bg-purple-50 rounded-2xl p-4 mb-5 w-full text-left text-purple-950 text-xs md:text-sm space-y-2 border-2 border-purple-200">
+                <div class="flex items-center gap-2 font-black text-purple-900 border-b-2 border-purple-200 pb-2">
+                    <i class="fa-solid fa-shapes text-purple-600"></i> 第一关：形状小侦探 (共 10 题)
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-xs pt-1 font-bold">
+                    <span class="bg-pink-100 p-2 rounded-xl text-pink-900 border border-pink-300 flex items-center gap-1"><i class="fa-solid fa-play text-pink-600"></i> 三角形 △</span>
+                    <span class="bg-sky-100 p-2 rounded-xl text-sky-900 border border-sky-300 flex items-center gap-1"><i class="fa-solid fa-circle text-sky-600"></i> 圆形 ○</span>
+                    <span class="bg-amber-100 p-2 rounded-xl text-amber-900 border border-amber-300 flex items-center gap-1"><i class="fa-solid fa-square text-amber-600"></i> 正方形 □</span>
+                    <span class="bg-emerald-100 p-2 rounded-xl text-emerald-900 border border-emerald-300 flex items-center gap-1"><i class="fa-solid fa-vector-square text-emerald-600"></i> 长方形 ▭</span>
+                </div>
+            </div>
+
+            <button id="start-btn" class="maze-btn w-full py-4 rounded-2xl text-white font-black text-2xl tracking-wider uppercase">
+                <i class="fa-solid fa-magnifying-glass mr-2"></i> 开始形状大冒险！
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN GAME UI -->
+    <div id="game-ui" class="hidden w-full h-full flex flex-col justify-between relative z-10 p-2 md:p-4">
+        <!-- TOP HUD -->
+        <div class="w-full max-w-4xl mx-auto mb-2">
+            <div class="maze-glass rounded-2xl p-3 flex flex-wrap items-center justify-between gap-2">
+                <!-- Level / Score -->
+                <div class="flex items-center gap-3">
+                    <div class="bg-purple-100 px-3 py-1 rounded-xl border-2 border-purple-600 flex items-center gap-1.5 font-black text-purple-900 text-xs md:text-sm">
+                        <span>关卡</span>
+                        <span id="level-display" class="text-purple-700 text-base">1/10</span>
+                    </div>
+                    <div class="bg-amber-400 px-3 py-1 rounded-xl border-2 border-amber-800 flex items-center gap-1.5 font-black text-amber-950 text-sm md:text-base shadow">
+                        <i class="fa-solid fa-star text-amber-100 drop-shadow"></i>
+                        <span id="score-display">0</span>
+                    </div>
+                </div>
+
+                <!-- Mission Indicator -->
+                <div class="bg-emerald-400 px-3 py-1 rounded-xl border-2 border-emerald-800 text-emerald-950 font-black text-xs flex items-center gap-1">
+                    <i class="fa-solid fa-key"></i>
+                    <span>剩余目标: <span id="targets-left" class="text-base font-extrabold text-emerald-950">1</span></span>
+                </div>
+            </div>
+
+            <!-- QUESTION BANNER -->
+            <div class="mt-2 text-center">
+                <div class="inline-block bg-purple-100/95 border-4 border-purple-600 px-5 py-2 rounded-2xl shadow-xl max-w-md w-full">
+                    <div class="text-[11px] font-black text-purple-800 uppercase tracking-widest" id="unit-tag">第一关：形状小侦探</div>
+                    <div class="text-base md:text-lg font-black text-pink-600 flex items-center justify-center gap-1.5" id="target-prompt">
+                        加载问题中...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CANVAS GAMEPLAY AREA -->
+        <div class="flex-1 w-full relative max-w-4xl mx-auto my-1 flex items-center justify-center" id="canvas-container">
+            <canvas id="mazeCanvas" class="block rounded-3xl border-4 border-purple-400 shadow-2xl bg-slate-900"></canvas>
+            
+            <!-- Floating Effect Layer -->
+            <div id="effect-layer" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+        </div>
+
+        <!-- BOTTOM CONTROLS (D-PAD) -->
+        <div class="w-full max-w-md mx-auto flex items-center justify-between gap-2 p-1">
+            <div class="grid grid-cols-3 gap-1.5 w-44 mx-auto">
+                <div></div>
+                <button id="btn-up" class="dpad-btn py-3 rounded-xl text-white font-black text-xl"><i class="fa-solid fa-arrow-up"></i></button>
+                <div></div>
+                <button id="btn-left" class="dpad-btn py-3 rounded-xl text-white font-black text-xl"><i class="fa-solid fa-arrow-left"></i></button>
+                <button id="btn-down" class="dpad-btn py-3 rounded-xl text-white font-black text-xl"><i class="fa-solid fa-arrow-down"></i></button>
+                <button id="btn-right" class="dpad-btn py-3 rounded-xl text-white font-black text-xl"><i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VICTORY / RESULT MODAL -->
+    <div id="result-modal" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+        <div class="maze-glass rounded-3xl p-8 max-w-md w-full text-center animate-pulse-glow">
+            <div class="w-20 h-20 bg-amber-300 rounded-2xl border-4 border-amber-800 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <i class="fa-solid fa-trophy text-5xl text-amber-700"></i>
+            </div>
+            <h2 class="text-3xl font-black text-purple-950 mb-1 drop-shadow">形状小侦探大胜利！</h2>
+            <p class="text-purple-800 font-bold text-sm mb-6">你成功通关了全部 10 道形状挑战题！</p>
+
+            <div class="bg-purple-100 rounded-2xl p-4 mb-6 border-2 border-purple-300 space-y-3 font-black text-purple-900">
+                <div class="flex justify-between items-center">
+                    <span>最终探索总分：</span>
+                    <span id="final-score" class="text-3xl text-pink-600">1000</span>
+                </div>
+            </div>
+
+            <button id="restart-btn" class="maze-btn w-full py-4 rounded-2xl text-white font-black text-xl tracking-wider uppercase">
+                <i class="fa-solid fa-rotate-right mr-2"></i> 再玩一次形状迷宫
+            </button>
+        </div>
+    </div>
+
+    <!-- GAME LOGIC SCRIPT -->
+    <script>
+        // --- 10 SHAPE QUESTIONS DATASET ---
+        const questionBank = [
+            {
+                unit: "第一关：形状小侦探 (1/10)",
+                targetPrompt: "哪一个是【三角形】？",
+                items: [
+                    { name: "三角形", icon: "△", isTarget: true },
+                    { name: "圆形", icon: "○", isTarget: false },
+                    { name: "正方形", icon: "□", isTarget: false }
+                ]
+            },
+            {
+                unit: "第一关：形状小侦探 (2/10)",
+                targetPrompt: "哪一个是【圆形】？",
+                items: [
+                    { name: "长方形", icon: "▭", isTarget: false },
+                    { name: "圆形", icon: "○", isTarget: true },
+                    { name: "三角形", icon: "△", isTarget: false }
+                ]
+            },
+            {
+                unit: "第一关：形状小侦探 (3/10)",
+                targetPrompt: "哪一个是【正方形】？",
+                items: [
+                    { name: "正方形", icon: "□", isTarget: true },
+                    { name: "三角形", icon: "△", isTarget: false },
+                    { name: "圆形", icon: "○", isTarget: false }
+                ]
+            },
+            {
+                unit: "第一关：形状小侦探 (4/10)",
+                targetPrompt: "哪一个是【长方形】？",
+                items: [
+                    { name: "圆形", icon: "○", isTarget: false },
+                    { name: "长方形", icon: "▭", isTarget: true },
+                    { name: "三角形", icon: "△", isTarget: false }
+                ]
+            },
+            {
+                unit: "第一关：形状小侦探 (5/10)",
+                targetPrompt: "三角形有【几条边】？",
+                items: [
+                    { name: "2 条", icon: "2️⃣", isTarget: false },
+                    { name: "3 条", icon: "3️⃣", isTarget: true },
+                    { name: "4 条", icon: "4️⃣", isTarget: false }
+                ]
+            },
+            {
+                unit: "第一关：形状小侦探 (6/10)",
+                targetPrompt: "正方形有【几条边】？",
+                items: [
+                    { name: "3 条", icon: "3️⃣", isTarget: false },
+                    { name: "4 条", icon: "4️⃣", isTarget: true },
+                    { name: "5 条", icon: "5️⃣", isTarget: false }
+                ]
+            },
+            {
+                unit: "第一关：形状小侦探 (7/10)",
+                targetPrompt: "圆形【有尖尖的角吗】？",
+                items: [
+                    { name: "有", icon: "✔️", isTarget: false },
+                    { name: "没有", icon: "❌", isTarget: true }
+                ]
+            },
+            {
+                unit: "第一关：形状小侦探 (8/10)",
+                targetPrompt: "哪一个物品的形状【像圆形】？",
+                items: [
+                    { name: "硬币", icon: "🪙", isTarget: true },
+                    { name: "课本", icon: "📘", isTarget: false },
+                    { name: "三角尺", icon: "📐", isTarget: false }
+                ]
+            },
+            {
+                unit: "第一关：形状小侦探 (9/10)",
+                targetPrompt: "哪一个物品的形状【像长方形】？",
+                items: [
+                    { name: "圆盘", icon: "🍽️", isTarget: false },
+                    { name: "课本封面", icon: "📖", isTarget: true },
+                    { name: "球", icon: "⚽", isTarget: false }
+                ]
+            },
+            {
+                unit: "第一关：形状小侦探 (10/10)",
+                targetPrompt: "屋顶的形状【像三角形】，选哪一个？",
+                items: [
+                    { name: "三角形", icon: "△", isTarget: true },
+                    { name: "圆形", icon: "○", isTarget: false }
+                ]
+            }
+        ];
+
+        // --- MAZE GRID SETTINGS ---
+        const COLS = 9;
+        const ROWS = 9;
+        let grid = [];
+        let cellSize = 40;
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let remainingTargets = 0;
+        let isGameRunning = false;
+        let isTransitioning = false;
+
+        let canvas, ctx;
+
+        // Player Avatar Position in Grid
+        const player = {
+            col: 0,
+            row: 0,
+            x: 0,
+            y: 0,
+            targetX: 0,
+            targetY: 0,
+            icon: "🧭"
+        };
+
+        let itemsInMaze = [];
+        let particles = [];
+
+        // Audio Effects Generator
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'move') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(450, now + 0.05);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'collect') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.setValueAtTime(659.25, now + 0.08);
+                osc.frequency.setValueAtTime(783.99, now + 0.16);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(120, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'win') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.setValueAtTime(659.25, now + 0.1);
+                osc.frequency.setValueAtTime(783.99, now + 0.2);
+                osc.frequency.setValueAtTime(1046.50, now + 0.35);
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+        }
+
+        // --- MAZE GENERATOR (Depth First Search) ---
+        class Cell {
+            constructor(r, c) {
+                this.r = r;
+                this.c = c;
+                this.walls = [true, true, true, true]; // Top, Right, Bottom, Left
+                this.visited = false;
+            }
+
+            checkNeighbors() {
+                let neighbors = [];
+                let top    = grid[index(this.r - 1, this.c)];
+                let right  = grid[index(this.r, this.c + 1)];
+                let bottom = grid[index(this.r + 1, this.c)];
+                let left   = grid[index(this.r, this.c - 1)];
+
+                if (top && !top.visited) neighbors.push(top);
+                if (right && !right.visited) neighbors.push(right);
+                if (bottom && !bottom.visited) neighbors.push(bottom);
+                if (left && !left.visited) neighbors.push(left);
+
+                if (neighbors.length > 0) {
+                    let r = Math.floor(Math.random() * neighbors.length);
+                    return neighbors[r];
+                } else {
+                    return undefined;
+                }
+            }
+        }
+
+        function index(r, c) {
+            if (r < 0 || c < 0 || r >= ROWS || c >= COLS) return -1;
+            return r * COLS + c;
+        }
+
+        function removeWalls(a, b) {
+            let x = a.c - b.c;
+            if (x === 1) { a.walls[3] = false; b.walls[1] = false; }
+            else if (x === -1) { a.walls[1] = false; b.walls[3] = false; }
+
+            let y = a.r - b.r;
+            if (y === 1) { a.walls[0] = false; b.walls[2] = false; }
+            else if (y === -1) { a.walls[2] = false; b.walls[0] = false; }
+        }
+
+        function generateMaze() {
+            grid = [];
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    grid.push(new Cell(r, c));
+                }
+            }
+
+            let current = grid[0];
+            current.visited = true;
+            let stack = [];
+
+            while (true) {
+                let next = current.checkNeighbors();
+                if (next) {
+                    next.visited = true;
+                    stack.push(current);
+                    removeWalls(current, next);
+                    current = next;
+                } else if (stack.length > 0) {
+                    current = stack.pop();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // --- INIT & CONTROLS ---
+        window.onload = () => {
+            canvas = document.getElementById('mazeCanvas');
+            ctx = canvas.getContext('2d');
+
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            document.getElementById('start-btn').addEventListener('click', startGame);
+            document.getElementById('restart-btn').addEventListener('click', startGame);
+
+            // D-Pad Touch / Click Events
+            document.getElementById('btn-up').addEventListener('click', () => movePlayer(0, -1));
+            document.getElementById('btn-down').addEventListener('click', () => movePlayer(0, 1));
+            document.getElementById('btn-left').addEventListener('click', () => movePlayer(-1, 0));
+            document.getElementById('btn-right').addEventListener('click', () => movePlayer(1, 0));
+
+            // Keyboard Arrow & WASD Controls
+            window.addEventListener('keydown', (e) => {
+                if (!isGameRunning) return;
+                if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') movePlayer(0, -1);
+                if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') movePlayer(0, 1);
+                if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') movePlayer(-1, 0);
+                if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') movePlayer(1, 0);
+            });
+        };
+
+        function resizeCanvas() {
+            const container = document.getElementById('canvas-container');
+            if (!container) return;
+            const size = Math.min(container.clientWidth - 20, container.clientHeight - 20, 420);
+            canvas.width = size;
+            canvas.height = size;
+            cellSize = size / COLS;
+        }
+
+        function startGame() {
+            currentQuestionIndex = 0;
+            score = 0;
+            particles = [];
+            isTransitioning = false;
+
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('result-modal').classList.add('hidden');
+            document.getElementById('game-ui').classList.remove('hidden');
+
+            resizeCanvas();
+            loadQuestion(currentQuestionIndex);
+
+            isGameRunning = true;
+            requestAnimationFrame(gameLoop);
+        }
+
+        function loadQuestion(idx) {
+            isTransitioning = false;
+            const q = questionBank[idx];
+            document.getElementById('unit-tag').innerText = q.unit;
+            document.getElementById('target-prompt').innerText = q.targetPrompt;
+            document.getElementById('level-display').innerText = `${idx + 1}/${questionBank.length}`;
+
+            // Generate Maze Layout
+            generateMaze();
+
+            // Set Player at Start (Top-Left 0,0)
+            player.col = 0;
+            player.row = 0;
+            player.x = player.col * cellSize + cellSize / 2;
+            player.y = player.row * cellSize + cellSize / 2;
+
+            // Place Items at Open Outer Cells
+            itemsInMaze = [];
+            remainingTargets = 0;
+
+            const availableCells = [
+                { r: 0, c: 8 },
+                { r: 8, c: 0 },
+                { r: 8, c: 8 },
+                { r: 4, c: 4 }
+            ];
+
+            q.items.forEach((item, indexPos) => {
+                const pos = availableCells[indexPos % availableCells.length];
+                if (item.isTarget) remainingTargets++;
+                itemsInMaze.push({
+                    row: pos.r,
+                    col: pos.c,
+                    name: item.name,
+                    icon: item.icon,
+                    isTarget: item.isTarget,
+                    collected: false
+                });
+            });
+
+            document.getElementById('targets-left').innerText = remainingTargets;
+            document.getElementById('score-display').innerText = score;
+        }
+
+        function movePlayer(dc, dr) {
+            if (!isGameRunning || isTransitioning) return;
+
+            let currentCell = grid[index(player.row, player.col)];
+            let nextCol = player.col + dc;
+            let nextRow = player.row + dr;
+
+            if (nextCol < 0 || nextCol >= COLS || nextRow < 0 || nextRow >= ROWS) return;
+
+            // Wall Collision Logic
+            if (dr === -1 && currentCell.walls[0]) return; // Top wall
+            if (dc === 1  && currentCell.walls[1]) return; // Right wall
+            if (dr === 1  && currentCell.walls[2]) return; // Bottom wall
+            if (dc === -1 && currentCell.walls[3]) return; // Left wall
+
+            player.col = nextCol;
+            player.row = nextRow;
+            playSound('move');
+
+            // Check Item Collision
+            itemsInMaze.forEach(item => {
+                if (!item.collected && item.col === player.col && item.row === player.row) {
+                    item.collected = true;
+                    if (item.isTarget) {
+                        playSound('collect');
+                        score += 100;
+                        remainingTargets--;
+                        document.getElementById('targets-left').innerText = remainingTargets;
+                        document.getElementById('score-display').innerText = score;
+                        createParticles(player.col * cellSize + cellSize/2, player.row * cellSize + cellSize/2, '#ec4899', 20);
+                        showFloatingText("+100分!", player.col * cellSize + cellSize/2, player.row * cellSize + cellSize/2, '#ec4899');
+                    } else {
+                        playSound('wrong');
+                        createParticles(player.col * cellSize + cellSize/2, player.row * cellSize + cellSize/2, '#94a3b8', 10);
+                        showFloatingText("不是这个哦!", player.col * cellSize + cellSize/2, player.row * cellSize + cellSize/2, '#a855f7');
+                    }
+                }
+            });
+
+            // Level Complete Transition
+            if (remainingTargets === 0 && !isTransitioning) {
+                isTransitioning = true;
+                setTimeout(() => {
+                    nextQuestion();
+                }, 400);
+            }
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex >= questionBank.length) {
+                endGame();
+            } else {
+                loadQuestion(currentQuestionIndex);
+            }
+        }
+
+        // --- MAIN RENDER LOOP ---
+        function gameLoop() {
+            if (!isGameRunning) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Maze Cells & Walls
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#a855f7';
+            ctx.fillStyle = '#1e1b4b';
+
+            for (let i = 0; i < grid.length; i++) {
+                let cell = grid[i];
+                let x = cell.c * cellSize;
+                let y = cell.r * cellSize;
+
+                ctx.fillRect(x, y, cellSize, cellSize);
+
+                ctx.beginPath();
+                if (cell.walls[0]) { ctx.moveTo(x, y); ctx.lineTo(x + cellSize, y); }
+                if (cell.walls[1]) { ctx.moveTo(x + cellSize, y); ctx.lineTo(x + cellSize, y + cellSize); }
+                if (cell.walls[2]) { ctx.moveTo(x + cellSize, y + cellSize); ctx.lineTo(x, y + cellSize); }
+                if (cell.walls[3]) { ctx.moveTo(x, y + cellSize); ctx.lineTo(x, y); }
+                ctx.stroke();
+            }
+
+            // Render Answer Items in Maze
+            itemsInMaze.forEach(item => {
+                if (item.collected) return;
+                let ix = item.col * cellSize + cellSize / 2;
+                let iy = item.row * cellSize + cellSize / 2;
+
+                ctx.save();
+                ctx.fillStyle = item.isTarget ? 'rgba(236, 72, 153, 0.25)' : 'rgba(148, 163, 184, 0.2)';
+                ctx.beginPath();
+                ctx.arc(ix, iy, cellSize * 0.38, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.font = `${cellSize * 0.55}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(item.icon, ix, iy);
+                ctx.restore();
+            });
+
+            // Draw Player Avatar Smoothly
+            let targetX = player.col * cellSize + cellSize / 2;
+            let targetY = player.row * cellSize + cellSize / 2;
+            player.x += (targetX - player.x) * 0.4;
+            player.y += (targetY - player.y) * 0.4;
+
+            ctx.save();
+            ctx.font = `${cellSize * 0.6}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(player.icon, player.x, player.y);
+            ctx.restore();
+
+            // Render Particles
+            updateParticles();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- PARTICLES & FLOATING TEXT ---
+        function createParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    radius: Math.random() * 4 + 2,
+                    color: color,
+                    alpha: 1,
+                    life: 0.05
+                });
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= p.life;
+
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function showFloatingText(text, x, y, color) {
+            const effectLayer = document.getElementById('effect-layer');
+            const elem = document.createElement('div');
+            elem.className = "absolute font-black text-xs md:text-sm pointer-events-none transition-all duration-500 drop-shadow-md";
+            elem.style.left = `${x}px`;
+            elem.style.top = `${y}px`;
+            elem.style.color = color;
+            elem.innerText = text;
+
+            effectLayer.appendChild(elem);
+
+            setTimeout(() => {
+                elem.style.transform = 'translateY(-20px)';
+                elem.style.opacity = '0';
+            }, 50);
+
+            setTimeout(() => {
+                elem.remove();
+            }, 600);
+        }
+
+        // --- END GAME ---
+        function endGame() {
+            isGameRunning = false;
+            const modal = document.getElementById('result-modal');
+            modal.classList.remove('hidden');
+
+            playSound('win');
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 160, spread: 80, origin: { y: 0.6 } });
+            }
+
+            document.getElementById('final-score').innerText = score;
+        }
+    </script>
+</body>
+</html>
